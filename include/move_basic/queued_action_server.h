@@ -43,8 +43,6 @@
 #include <condition_variable>
 #include <string>
 #include <thread>
-#include <atomic>
-#include <mutex>
 
 namespace actionlib {
 template <class ActionSpec>

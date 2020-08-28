@@ -137,6 +137,7 @@ class MoveBasic {
                     const std::string& planningFrame,
                     const std::string& drivingFrame);
     bool rotate(double requestedYaw,
+                const std::string& planningFrame,
                 const std::string& drivingFrame);
 
     tf2::Transform goalInPlanning;
@@ -210,9 +211,9 @@ MoveBasic::MoveBasic(): tfBuffer(ros::Duration(3.0)),
     nh.param<double>("linear_tolerance", linearTolerance, 0.03);
 
     // Parameters for turn PID
-    nh.param<double>("lateral_kp", lateralKp, 10.0);
-    nh.param<double>("lateral_ki", lateralKi, 0.0);
-    nh.param<double>("lateral_kd", lateralKd, 0.0);
+    nh.param<double>("lateral_kp", lateralKp, 0.3);
+    nh.param<double>("lateral_ki", lateralKi, 0.05);
+    nh.param<double>("lateral_kd", lateralKd, 0.5);
 
     // Minimum distance to maintain at each side
     nh.param<double>("min_side_dist", minSideDist, 0.3);
@@ -352,6 +353,8 @@ void MoveBasic::executeAction(const move_base_msgs::MoveBaseGoalConstPtr& msg)
     tf2::fromMsg(msg->target_pose.pose, goal);
     std::string frameId = msg->target_pose.header.frame_id;
 
+    ROS_INFO("frameID : %c", frameId.c_str());
+
     // Needed for RobotCommander
     if (frameId[0] == '/')
         frameId = frameId.substr(1);
@@ -479,12 +482,15 @@ void MoveBasic::executeAction(const move_base_msgs::MoveBaseGoalConstPtr& msg)
             if (std::abs(requestedYaw) < angularTolerance) {
                 break;
             }
-            if (!rotate(requestedYaw, drivingFrame)) {
+            if (!rotate(requestedYaw, planningFrame, drivingFrame)) {
                 return;
             }
             sleep(localizationLatency);
         }
     }
+
+    // Pause between actions
+    sleep(0.3);
 
     // Do linear portion of goal
     ROS_INFO("MoveBasic: Requested distance %f", dist);
@@ -509,6 +515,9 @@ void MoveBasic::executeAction(const move_base_msgs::MoveBaseGoalConstPtr& msg)
         sleep(localizationLatency);
     }
 
+    //
+    sleep(0.3);
+
     // Final rotation as specified in goal
     tf2::Transform finalPose;
     if (!getTransform(baseFrame, drivingFrame, finalPose)) {
@@ -517,7 +526,7 @@ void MoveBasic::executeAction(const move_base_msgs::MoveBaseGoalConstPtr& msg)
     }
 
     getPose(finalPose, x, y, yaw);
-    rotate(goalYaw - yaw, drivingFrame);
+    rotate(goalYaw - yaw, planningFrame, drivingFrame);
 
 /*
     sleep(10);
@@ -578,7 +587,8 @@ void MoveBasic::run()
 
 // Rotate relative to current orientation
 
-bool MoveBasic::rotate(double yaw, const std::string& drivingFrame)
+bool MoveBasic::rotate(double yaw, const std::string& planningFrame,
+                       const std::string& drivingFrame)
 {
     ROS_INFO("MoveBasic: Requested rotation %f", rad2deg(yaw));
 
@@ -610,7 +620,7 @@ bool MoveBasic::rotate(double yaw, const std::string& drivingFrame)
             return false;
         }
         getPose(poseDriving, x, y, currentYaw);
-
+        // ROS_INFO("current yaw: %f", currentYaw); 
         double angleRemaining = requestedYaw - currentYaw;
         normalizeAngle(angleRemaining);
 
@@ -659,12 +669,13 @@ bool MoveBasic::moveLinear(tf2::Transform& goalInDriving,
                            const std::string& planningFrame,
                            const std::string& drivingFrame)
 {
+    ROS_INFO("frames %s %s", planningFrame, drivingFrame);
     bool done = false;
     ros::Rate r(50);
 
     bool waitingForObstacle = false;
     int  waitingLoops = 0;
-    double forwardObstacleThreshold = 1.5;  // if distance <  velocity times this we stop
+    double forwardObstacleThreshold = 2;  // if distance <  velocity times this we stop
     ros::Time obstacleTime;
 
     tf2::Transform poseDrivingInitial;
@@ -800,14 +811,31 @@ bool MoveBasic::moveLinear(tf2::Transform& goalInDriving,
         }
 
         double velocity = std::max(minLinearVelocity,
-            std::min(maxLinearVelocity, std::min(
-              std::sqrt(2.0 * linearAcceleration * std::abs(distTravelled)),
-              std::sqrt(0.5 * linearAcceleration *
-                 std::min(obstacleDist, distRemaining)))));
+            std::min(maxLinearVelocity, 
+		std::min(std::sqrt(1.8 * linearAcceleration * std::abs(distTravelled)),
+	    		 std::sqrt(0.45 * linearAcceleration * std::min(obstacleDist, distRemaining)))));
+//----------------------------------------------------------------------------------------------------------------------
+//
+//         ROS_INFO ("VELOCITY : %f", velocity);
+//	 ROS_INFO ("distTravelled : %f", distTravelled);
+  //       ROS_INFO ("distRemaining : %f", distRemaining);
+//	 ROS_INFO ("obstacleDist : %f", obstacleDist);  
+         ROS_INFO ("remaining.x(): %f", remaining.x());
+         ROS_INFO ("linear.x(): %f, linear.y(): %f", linear.x(), linear.y());
+
+
+
+
+
+
+
+
 
         // Stop if there is an obstacle in the distance we would hit in given time
-        bool obstacleDetected = obstacleDist <= velocity * forwardObstacleThreshold;
+        bool obstacleDetected = obstacleDist <= 2;
+
         if (obstacleDetected) {
+	    ROS_INFO("OBSTACLE DETECTED");
             velocity = 0;
             if (!waitingForObstacle) {
                 ROS_INFO("MoveBasic: PAUSING for OBSTACLE");

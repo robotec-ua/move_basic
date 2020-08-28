@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2020, Ubiquity Robotics
  * All rights reserved.
@@ -93,8 +94,11 @@ void ObstaclePoints::range_callback(const sensor_msgs::Range::ConstPtr &msg) {
                                left_vector, right_vector);
             sensor.update(msg->range, msg->header.stamp);
             sensors[frame] = sensor;
+	    ROS_INFO("ADDED FRAME : %s", frame.c_str());
+	    ROS_INFO("ARRAY SIZE : %d ", sensors.size());
         }
         catch (tf2::TransformException &ex) {
+	    ROS_INFO ("EXCEPTION");
             ROS_WARN("%s", ex.what());
         }
     }
@@ -102,6 +106,7 @@ void ObstaclePoints::range_callback(const sensor_msgs::Range::ConstPtr &msg) {
         RangeSensor& sensor = it->second;
         sensor.update(msg->range, msg->header.stamp);
     }
+   // ROS_INFO("SENSORS ARRAY SIZE : %d", sensors.size());
 }
 
 void ObstaclePoints::scan_callback(const sensor_msgs::LaserScan::ConstPtr &msg)
