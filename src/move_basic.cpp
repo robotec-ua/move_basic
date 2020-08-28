@@ -85,6 +85,8 @@ class MoveBasic {
     double maxLinearVelocity;
     double linearAcceleration;
     double linearTolerance;
+    double minStopDist;
+    double minObstacleDist;
 
     // PID parameters for controlling lateral error
     double lateralKp;
@@ -200,15 +202,17 @@ MoveBasic::MoveBasic(): tfBuffer(ros::Duration(3.0)),
 {
     ros::NodeHandle nh("~");
 
-    nh.param<double>("min_angular_velocity", minAngularVelocity, 0.05);
-    nh.param<double>("max_angular_velocity", maxAngularVelocity, 1.0);
+    nh.param<double>("min_angular_velocity", minAngularVelocity, 0.1);
+    nh.param<double>("max_angular_velocity", maxAngularVelocity, 0.5);
     nh.param<double>("angular_acceleration", angularAcceleration, 0.3);
     nh.param<double>("angular_tolerance", angularTolerance, 0.01);
 
     nh.param<double>("min_linear_velocity", minLinearVelocity, 0.1);
     nh.param<double>("max_linear_velocity", maxLinearVelocity, 0.5);
     nh.param<double>("linear_acceleration", linearAcceleration, 0.25);
-    nh.param<double>("linear_tolerance", linearTolerance, 0.03);
+    nh.param<double>("linear_tolerance", linearTolerance, 0.01);
+    nh.param<double>("min_obstacle_distance", minObstacleDist, 2.0);
+    nh.param<double>("min_stop_distance", minStopDist, 0.5);
 
     // Parameters for turn PID
     nh.param<double>("lateral_kp", lateralKp, 0.3);
@@ -228,7 +232,7 @@ MoveBasic::MoveBasic(): tfBuffer(ros::Duration(3.0)),
     nh.param<double>("max_lateral_rotation", lateralMaxRotation, 0.5);
 
     // Weighting of turning to recover from avoiding side obstacles
-    nh.param<double>("side_recover_weight", sideRecoverWeight, 0.3);
+    nh.param<double>("side_recover_weight", sideRecoverWeight, 0.1);
 
     // how long to wait after moving to be sure localization is accurate
     nh.param<double>("localization_latency", localizationLatency, 0.5);
@@ -275,7 +279,9 @@ MoveBasic::MoveBasic(): tfBuffer(ros::Duration(3.0)),
     obstacle_points.reset(new ObstaclePoints(nh, tfBuffer));
     collision_checker.reset(new CollisionChecker(nh, tfBuffer, *obstacle_points));
 
-    ROS_INFO("Move Basic ready");
+    ROS_INFO("__________________________________");
+    ROS_INFO("Move Basic ready2");
+//    ROS_INFO("MINIMUM VALUE : %f", minLinearVelocity);
 }
 
 
@@ -450,7 +456,7 @@ void MoveBasic::executeAction(const move_base_msgs::MoveBaseGoalConstPtr& msg)
     {
        double x, y, yaw;
        getPose(goalInBase, x, y, yaw);
-       ROS_INFO("MoveBasic: Goal in %s  %f %f %f", baseFrame.c_str(),
+       ROS_INFO(" MoveBasic: Goal in %s  %f %f %f", baseFrame.c_str(),
              x, y, rad2deg(yaw));
     }
 
@@ -460,6 +466,7 @@ void MoveBasic::executeAction(const move_base_msgs::MoveBaseGoalConstPtr& msg)
     bool reverseWithoutTurning =
         (reverseWithoutTurningThreshold > dist && linear.x() < 0.0);
 
+    ROS_INFO("MoveBasic: dist %f, lin toller %f, rot attempts %f", dist, linearTolerance ,rotationAttempts);
     // Initial rotation to face goal
     for (int i=0; i<rotationAttempts; i++) {
         tf2::Transform goalInBase;
@@ -478,7 +485,7 @@ void MoveBasic::executeAction(const move_base_msgs::MoveBaseGoalConstPtr& msg)
                     requestedYaw = M_PI - requestedYaw;
                 }
             }
-
+	    ROS_INFO("MoveBasic: Requested yaw %f, yaw %f", requestedYaw, yaw);
             if (std::abs(requestedYaw) < angularTolerance) {
                 break;
             }
@@ -488,7 +495,6 @@ void MoveBasic::executeAction(const move_base_msgs::MoveBaseGoalConstPtr& msg)
             sleep(localizationLatency);
         }
     }
-
     // Pause between actions
     sleep(0.3);
 
@@ -794,6 +800,9 @@ bool MoveBasic::moveLinear(tf2::Transform& goalInDriving,
                   remaining.x(), remaining.y(), lateralError,
                   rotation, rad2deg(cyaw));
 
+
+        ROS_INFO ("cx: %f, cy: %f, cyaw : %f", remaining.x(), remaining.y(), rad2deg(cyaw)); 
+
         // Publish messages for PID tuning
         geometry_msgs::Vector3 pid_debug;
         pid_debug.x = remaining.x();
@@ -802,6 +811,9 @@ bool MoveBasic::moveLinear(tf2::Transform& goalInDriving,
         errorPub.publish(pid_debug);
 
         double obstacleDist = forwardObstacleDist;
+
+        if (obstacleDist >= minObstacleDist) obstacleDist = 9.63;
+
         if (requestedDistance < 0.0) { // Reverse
             obstacleDist = collision_checker->obstacle_dist(false,
                                                             leftObstacleDist,
@@ -820,8 +832,8 @@ bool MoveBasic::moveLinear(tf2::Transform& goalInDriving,
 //	 ROS_INFO ("distTravelled : %f", distTravelled);
   //       ROS_INFO ("distRemaining : %f", distRemaining);
 //	 ROS_INFO ("obstacleDist : %f", obstacleDist);  
-         ROS_INFO ("remaining.x(): %f", remaining.x());
-         ROS_INFO ("linear.x(): %f, linear.y(): %f", linear.x(), linear.y());
+         //ROS_INFO ("remaining.x(): %f", remaining.x());
+         //ROS_INFO ("linear.x(): %f, linear.y(): %f", linear.x(), linear.y());
 
 
 
@@ -832,7 +844,7 @@ bool MoveBasic::moveLinear(tf2::Transform& goalInDriving,
 
 
         // Stop if there is an obstacle in the distance we would hit in given time
-        bool obstacleDetected = obstacleDist <= 2;
+        bool obstacleDetected = obstacleDist <= minStopDist;
 
         if (obstacleDetected) {
 	    ROS_INFO("OBSTACLE DETECTED");
