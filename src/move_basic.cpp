@@ -280,8 +280,7 @@ MoveBasic::MoveBasic(): tfBuffer(ros::Duration(3.0)),
     collision_checker.reset(new CollisionChecker(nh, tfBuffer, *obstacle_points));
 
     ROS_INFO("__________________________________");
-    ROS_INFO("Move Basic ready2");
-//    ROS_INFO("MINIMUM VALUE : %f", minLinearVelocity);
+    ROS_INFO("Move Basic ready!");
 }
 
 
@@ -826,22 +825,6 @@ bool MoveBasic::moveLinear(tf2::Transform& goalInDriving,
             std::min(maxLinearVelocity, 
 		std::min(std::sqrt(1.8 * linearAcceleration * std::abs(distTravelled)),
 	    		 std::sqrt(0.45 * linearAcceleration * std::min(obstacleDist, distRemaining)))));
-//----------------------------------------------------------------------------------------------------------------------
-//
-//         ROS_INFO ("VELOCITY : %f", velocity);
-//	 ROS_INFO ("distTravelled : %f", distTravelled);
-  //       ROS_INFO ("distRemaining : %f", distRemaining);
-//	 ROS_INFO ("obstacleDist : %f", obstacleDist);  
-         //ROS_INFO ("remaining.x(): %f", remaining.x());
-         //ROS_INFO ("linear.x(): %f, linear.y(): %f", linear.x(), linear.y());
-
-
-
-
-
-
-
-
 
         // Stop if there is an obstacle in the distance we would hit in given time
         bool obstacleDetected = obstacleDist <= minStopDist;
