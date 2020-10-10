@@ -2,6 +2,13 @@
 Changelog for package move_basic
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.3.3 (2020-08-28)
+------------------
+* Fixed the bug of 0.0 travelled distance
+* Changed the logic of stopping in front of an obstacle (added a parameter to configure minimal distance to the obstacle from where the robot would stop)
+* Changed the logic of detecting obstacles (added a parameter to configure minimal distance to an obstacle from where the obstacle will affect robot's movement)
+* Contributors: Illia Shvarov
+
 0.3.2 (2018-03-03)
 ------------------
 * Don't rotate to go small distances
